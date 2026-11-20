@@ -67,6 +67,8 @@ docker compose exec shard0-primary psql -U postgres -d catalog \
 | 30 min | Stop WEST, write again and observe EAST advancing. Restart WEST and check pending rows drain. |
 | 15 min | Explain what happens after a worker crash before Redis, after Redis, and after the SQL acknowledgment. |
 
+Redis gossip records numeric bus addresses. Compose reserves a stable IP per member; Kubernetes advertises one stable Service IP per member. If the default Docker subnet overlaps your network, set `LAB_NETWORK_PREFIX` in `.env` to an unused three-octet prefix before first start.
+
 Pause with `docker compose stop` and resume with `docker compose start`. Keep the generated `.env` with its volumes.
 
 ## Kubernetes

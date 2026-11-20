@@ -105,6 +105,9 @@ services:
       start_period: 8s
     restart: unless-stopped
   east-0:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.10
     image: redis:7.4-alpine
     environment:
       REGION_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
@@ -125,6 +128,9 @@ services:
       start_period: 8s
     restart: unless-stopped
   east-1:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.11
     image: redis:7.4-alpine
     environment:
       REGION_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
@@ -145,6 +151,9 @@ services:
       start_period: 8s
     restart: unless-stopped
   east-2:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.12
     image: redis:7.4-alpine
     environment:
       REGION_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
@@ -182,6 +191,9 @@ services:
     volumes:
     - ./infra/form-cluster.sh:/config/form-cluster.sh:ro
   west-0:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.20
     image: redis:7.4-alpine
     environment:
       REGION_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
@@ -202,6 +214,9 @@ services:
       start_period: 8s
     restart: unless-stopped
   west-1:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.21
     image: redis:7.4-alpine
     environment:
       REGION_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
@@ -222,6 +237,9 @@ services:
       start_period: 8s
     restart: unless-stopped
   west-2:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.22
     image: redis:7.4-alpine
     environment:
       REGION_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
@@ -329,3 +347,10 @@ volumes:
   west-0-data: {}
   west-1-data: {}
   west-2-data: {}
+
+# Keep Redis Cluster bus addresses stable across a simultaneous regional restart.
+networks:
+  default:
+    ipam:
+      config:
+      - subnet: ${LAB_NETWORK_PREFIX:-172.29.74}.0/24

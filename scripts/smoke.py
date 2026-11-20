@@ -78,5 +78,13 @@ try:
     assert sql("shard1-primary", "catalog", f"SELECT count(*) FROM cache_job WHERE sku='{sku}' AND region='WEST'") == "1"
 finally:
     compose("start", *west)
-eventually("recovered region catches up", lambda: matches(path + "?region=WEST", "second", "redis-WEST"))
+try:
+    eventually("recovered region catches up", lambda: matches(path + "?region=WEST", "second", "redis-WEST"))
+except AssertionError:
+    for node in west:
+        print(node, compose("exec", "-T", node, "sh", "-c",
+                            'REDISCLI_AUTH="$REGION_PASSWORD" redis-cli cluster nodes'))
+    print(sql("shard1-primary", "catalog",
+              f"SELECT region,version,due_at,attempts FROM cache_job WHERE sku='{sku}'"))
+    raise
 print("PASS independent regional retry and replica fallback")
