@@ -1,0 +1,6 @@
+apiVersion: v2
+name: catalog
+description: Tenant-sharded catalog and regional Redis relay
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

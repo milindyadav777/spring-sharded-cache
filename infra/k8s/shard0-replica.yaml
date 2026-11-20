@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shard0-replica
+spec:
+  selector:
+    app.kubernetes.io/name: shard0-replica
+  ports:
+  - name: p-5432
+    port: 5432
+    targetPort: 5432
+  clusterIP: None
+  publishNotReadyAddresses: true
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: shard0-replica
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shard0-replica
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shard0-replica
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+      - name: shard0-replica
+        image: postgres:17.11
+        env:
+        - name: POSTGRES_USER
+          value: postgres
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_DB
+          value: catalog
+        - name: PRIMARY_HOST
+          value: shard0-primary
+        - name: REPL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: lab-credentials
+              key: REPL_PASSWORD
+        command:
+        - sh
+        - /config/standby.sh
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: scripts
+          mountPath: /config/standby.sh
+          subPath: standby.sh
+          readOnly: true
+        ports:
+        - containerPort: 5432
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -q -h 127.0.0.1 -U postgres -d catalog
+          periodSeconds: 12
+          timeoutSeconds: 8
+      volumes:
+      - name: scripts
+        configMap:
+          name: lab-scripts
+          defaultMode: 365
+  serviceName: shard0-replica
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
