@@ -1,0 +1,27 @@
+image: spring-sharded-cache:local
+imagePullPolicy: IfNotPresent
+existingSecret: lab-credentials
+roles: [api, worker]
+httpRole: api
+env:
+  DB_USER: "catalog_app"
+  SHARD0_PRIMARY_URL: "jdbc:postgresql://shard0-primary:5432/catalog"
+  SHARD0_REPLICA_URL: "jdbc:postgresql://shard0-replica:5432/catalog"
+  SHARD1_PRIMARY_URL: "jdbc:postgresql://shard1-primary:5432/catalog"
+  SHARD1_REPLICA_URL: "jdbc:postgresql://shard1-replica:5432/catalog"
+  REDIS_EAST_NODES: "east-0:6379,east-1:6379,east-2:6379"
+  REDIS_WEST_NODES: "west-0:6379,west-1:6379,west-2:6379"
+secretKeys: [DB_PASSWORD, REDIS_EAST_PASSWORD, REDIS_WEST_PASSWORD]
+resources:
+  requests: {cpu: 100m, memory: 192Mi}
+  limits: {cpu: "1", memory: 512Mi}
+scaling:
+  enabled: true
+  min: 0
+  max: 4
+  shardHosts: ["shard0-primary.{{ .Release.Namespace }}.svc", "shard1-primary.{{ .Release.Namespace }}.svc"]
+  database: catalog
+  user: backlog_reader
+  passwordKey: SCALER_PASSWORD
+  sslmode: disable
+  readyJobsPerPod: "25"

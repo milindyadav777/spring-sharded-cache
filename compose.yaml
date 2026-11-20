@@ -1,0 +1,356 @@
+name: spring-sharded-cache
+services:
+  shard0-primary:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: catalog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/init-env.sh}
+      DB_PASSWORD: ${DB_PASSWORD:?run scripts/init-env.sh}
+      REPL_PASSWORD: ${REPL_PASSWORD:?run scripts/init-env.sh}
+      SCALER_PASSWORD: ${SCALER_PASSWORD:?run scripts/init-env.sh}
+    command:
+    - postgres
+    - -c
+    - wal_keep_size=256MB
+    volumes:
+    - shard0-primary-data:/var/lib/postgresql/data
+    - ./infra/primary.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -q -h 127.0.0.1 -U postgres -d catalog
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  shard0-replica:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: catalog
+      PRIMARY_HOST: shard0-primary
+      REPL_PASSWORD: ${REPL_PASSWORD:?run scripts/init-env.sh}
+    entrypoint:
+    - sh
+    - /config/standby.sh
+    depends_on:
+      shard0-primary:
+        condition: service_healthy
+    volumes:
+    - shard0-replica-data:/var/lib/postgresql/data
+    - ./infra/standby.sh:/config/standby.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -q -h 127.0.0.1 -U postgres -d catalog
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  shard1-primary:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: catalog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/init-env.sh}
+      DB_PASSWORD: ${DB_PASSWORD:?run scripts/init-env.sh}
+      REPL_PASSWORD: ${REPL_PASSWORD:?run scripts/init-env.sh}
+      SCALER_PASSWORD: ${SCALER_PASSWORD:?run scripts/init-env.sh}
+    command:
+    - postgres
+    - -c
+    - wal_keep_size=256MB
+    volumes:
+    - shard1-primary-data:/var/lib/postgresql/data
+    - ./infra/primary.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -q -h 127.0.0.1 -U postgres -d catalog
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  shard1-replica:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: catalog
+      PRIMARY_HOST: shard1-primary
+      REPL_PASSWORD: ${REPL_PASSWORD:?run scripts/init-env.sh}
+    entrypoint:
+    - sh
+    - /config/standby.sh
+    depends_on:
+      shard1-primary:
+        condition: service_healthy
+    volumes:
+    - shard1-replica-data:/var/lib/postgresql/data
+    - ./infra/standby.sh:/config/standby.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -q -h 127.0.0.1 -U postgres -d catalog
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  east-0:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.10
+    image: redis:7.4-alpine
+    environment:
+      REGION_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
+      NODE_NAME: east-0
+    entrypoint:
+    - sh
+    - /config/redis.sh
+    volumes:
+    - east-0-data:/data
+    - ./infra/redis.sh:/config/redis.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REGION_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  east-1:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.11
+    image: redis:7.4-alpine
+    environment:
+      REGION_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
+      NODE_NAME: east-1
+    entrypoint:
+    - sh
+    - /config/redis.sh
+    volumes:
+    - east-1-data:/data
+    - ./infra/redis.sh:/config/redis.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REGION_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  east-2:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.12
+    image: redis:7.4-alpine
+    environment:
+      REGION_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
+      NODE_NAME: east-2
+    entrypoint:
+    - sh
+    - /config/redis.sh
+    volumes:
+    - east-2-data:/data
+    - ./infra/redis.sh:/config/redis.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REGION_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  east-init:
+    image: redis:7.4-alpine
+    environment:
+      REGION: east
+      REGION_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
+    entrypoint:
+    - sh
+    - /config/form-cluster.sh
+    depends_on:
+      east-0:
+        condition: service_healthy
+      east-1:
+        condition: service_healthy
+      east-2:
+        condition: service_healthy
+    volumes:
+    - ./infra/form-cluster.sh:/config/form-cluster.sh:ro
+  west-0:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.20
+    image: redis:7.4-alpine
+    environment:
+      REGION_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
+      NODE_NAME: west-0
+    entrypoint:
+    - sh
+    - /config/redis.sh
+    volumes:
+    - west-0-data:/data
+    - ./infra/redis.sh:/config/redis.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REGION_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  west-1:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.21
+    image: redis:7.4-alpine
+    environment:
+      REGION_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
+      NODE_NAME: west-1
+    entrypoint:
+    - sh
+    - /config/redis.sh
+    volumes:
+    - west-1-data:/data
+    - ./infra/redis.sh:/config/redis.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REGION_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  west-2:
+    networks:
+      default:
+        ipv4_address: ${LAB_NETWORK_PREFIX:-172.29.74}.22
+    image: redis:7.4-alpine
+    environment:
+      REGION_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
+      NODE_NAME: west-2
+    entrypoint:
+    - sh
+    - /config/redis.sh
+    volumes:
+    - west-2-data:/data
+    - ./infra/redis.sh:/config/redis.sh:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REGION_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 8s
+      retries: 25
+      start_period: 8s
+    restart: unless-stopped
+  west-init:
+    image: redis:7.4-alpine
+    environment:
+      REGION: west
+      REGION_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
+    entrypoint:
+    - sh
+    - /config/form-cluster.sh
+    depends_on:
+      west-0:
+        condition: service_healthy
+      west-1:
+        condition: service_healthy
+      west-2:
+        condition: service_healthy
+    volumes:
+    - ./infra/form-cluster.sh:/config/form-cluster.sh:ro
+  api:
+    image: spring-sharded-cache:local
+    build: .
+    environment:
+      APP_ROLE: api
+      DB_USER: catalog_app
+      DB_PASSWORD: ${DB_PASSWORD:?run scripts/init-env.sh}
+      REDIS_EAST_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
+      REDIS_WEST_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
+      SHARD0_PRIMARY_URL: jdbc:postgresql://shard0-primary:5432/catalog
+      SHARD0_REPLICA_URL: jdbc:postgresql://shard0-replica:5432/catalog
+      SHARD1_PRIMARY_URL: jdbc:postgresql://shard1-primary:5432/catalog
+      SHARD1_REPLICA_URL: jdbc:postgresql://shard1-replica:5432/catalog
+      REDIS_EAST_NODES: east-0:6379,east-1:6379,east-2:6379
+      REDIS_WEST_NODES: west-0:6379,west-1:6379,west-2:6379
+    depends_on:
+      shard0-primary:
+        condition: service_healthy
+      shard1-primary:
+        condition: service_healthy
+      shard0-replica:
+        condition: service_healthy
+      shard1-replica:
+        condition: service_healthy
+      east-init:
+        condition: service_completed_successfully
+      west-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:8081:8080
+  worker:
+    image: spring-sharded-cache:local
+    pull_policy: never
+    environment:
+      APP_ROLE: worker
+      DB_USER: catalog_app
+      DB_PASSWORD: ${DB_PASSWORD:?run scripts/init-env.sh}
+      REDIS_EAST_PASSWORD: ${REDIS_EAST_PASSWORD:?run scripts/init-env.sh}
+      REDIS_WEST_PASSWORD: ${REDIS_WEST_PASSWORD:?run scripts/init-env.sh}
+      SHARD0_PRIMARY_URL: jdbc:postgresql://shard0-primary:5432/catalog
+      SHARD0_REPLICA_URL: jdbc:postgresql://shard0-replica:5432/catalog
+      SHARD1_PRIMARY_URL: jdbc:postgresql://shard1-primary:5432/catalog
+      SHARD1_REPLICA_URL: jdbc:postgresql://shard1-replica:5432/catalog
+      REDIS_EAST_NODES: east-0:6379,east-1:6379,east-2:6379
+      REDIS_WEST_NODES: west-0:6379,west-1:6379,west-2:6379
+    depends_on:
+      shard0-primary:
+        condition: service_healthy
+      shard1-primary:
+        condition: service_healthy
+      shard0-replica:
+        condition: service_healthy
+      shard1-replica:
+        condition: service_healthy
+      east-init:
+        condition: service_completed_successfully
+      west-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+volumes:
+  shard0-primary-data: {}
+  shard0-replica-data: {}
+  shard1-primary-data: {}
+  shard1-replica-data: {}
+  east-0-data: {}
+  east-1-data: {}
+  east-2-data: {}
+  west-0-data: {}
+  west-1-data: {}
+  west-2-data: {}
+
+# Keep Redis Cluster bus addresses stable across a simultaneous regional restart.
+networks:
+  default:
+    ipam:
+      config:
+      - subnet: ${LAB_NETWORK_PREFIX:-172.29.74}.0/24

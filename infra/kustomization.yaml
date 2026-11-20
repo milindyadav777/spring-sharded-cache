@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- k8s/shard0-primary.yaml
+- k8s/shard0-replica.yaml
+- k8s/shard1-primary.yaml
+- k8s/shard1-replica.yaml
+- k8s/east-0.yaml
+- k8s/east-1.yaml
+- k8s/east-2.yaml
+- k8s/east-init.yaml
+- k8s/west-0.yaml
+- k8s/west-1.yaml
+- k8s/west-2.yaml
+- k8s/west-init.yaml
+configMapGenerator:
+- name: lab-scripts
+  files:
+  - form-cluster.sh
+  - primary.sh
+  - redis.sh
+  - standby.sh

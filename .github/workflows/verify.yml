@@ -1,0 +1,48 @@
+name: Verify reference stack
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v4
+    - uses: azure/setup-helm@v4
+      with:
+        version: v3.16.4
+    - uses: azure/setup-kubectl@v4
+      with:
+        version: v1.32.3
+    - name: Build Java 17, render manifests and exercise the stack
+      run: ./scripts/check.sh
+    - name: Inspect failing services
+      if: failure()
+      run: |
+        docker compose ps -a
+        docker compose logs --tail=80 api worker east-init west-init shard0-replica shard1-replica
+    - name: Stop runner containers
+      if: always()
+      run: docker compose down -v
+
+  kubernetes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+    - uses: actions/checkout@v4
+    - uses: azure/setup-helm@v4
+      with:
+        version: v3.16.4
+    - name: Run on a local Kubernetes cluster with KEDA
+      run: |
+        ./scripts/kind-up.sh
+        ./scripts/kind-smoke.sh
+    - name: Inspect Kubernetes failure
+      if: failure()
+      run: |
+        kubectl --context kind-spring-labs -n catalog-lab get pods,job,scaledobject,hpa,pvc -o wide
+        kubectl --context kind-spring-labs -n catalog-lab get events --sort-by=.lastTimestamp | tail -60

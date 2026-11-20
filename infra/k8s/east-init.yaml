@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: east-init
+spec:
+  backoffLimit: 12
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: east-init
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+      - name: east-init
+        image: redis:7.4-alpine
+        env:
+        - name: REGION
+          value: east
+        - name: REGION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: lab-credentials
+              key: REDIS_EAST_PASSWORD
+        command:
+        - sh
+        - /config/form-cluster.sh
+        volumeMounts:
+        - name: scripts
+          mountPath: /config/form-cluster.sh
+          subPath: form-cluster.sh
+          readOnly: true
+      volumes:
+      - name: scripts
+        configMap:
+          name: lab-scripts
+          defaultMode: 365
+      restartPolicy: OnFailure

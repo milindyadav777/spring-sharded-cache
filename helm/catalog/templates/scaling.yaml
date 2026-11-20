@@ -1,0 +1,36 @@
+{{- if .Values.scaling.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ .Release.Name }}-backlog
+spec:
+  secretTargetRef:
+  - parameter: password
+    name: {{ .Values.existingSecret }}
+    key: {{ .Values.scaling.passwordKey }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Release.Name }}-worker
+spec:
+  scaleTargetRef:
+    name: {{ .Release.Name }}-worker
+  minReplicaCount: {{ .Values.scaling.min }}
+  maxReplicaCount: {{ .Values.scaling.max }}
+  pollingInterval: 10
+  cooldownPeriod: 90
+  triggers:
+  {{- range $index, $host := .Values.scaling.shardHosts }}
+  - type: postgresql
+    metadata:
+      host: {{ tpl $host $ | quote }}
+      port: "5432"
+      dbName: {{ $.Values.scaling.database | quote }}
+      userName: {{ $.Values.scaling.user | quote }}
+      sslmode: {{ $.Values.scaling.sslmode | quote }}
+      query: "SELECT count(due_at) FROM cache_job WHERE due_at <= now()"
+      targetQueryValue: {{ $.Values.scaling.readyJobsPerPod | quote }}
+    authenticationRef: {name: {{ $.Release.Name }}-backlog}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,71 @@
+{{- range $role := .Values.roles }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  {{- if or (not $.Values.scaling.enabled) (eq $role "api") }}
+  replicas: 1
+  {{- end }}
+  selector:
+    matchLabels: {app: {{ $.Release.Name }}-{{ $role }}}
+  template:
+    metadata:
+      labels: {app: {{ $.Release.Name }}-{{ $role }}}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 40
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+      - name: app
+        image: {{ $.Values.image | quote }}
+        imagePullPolicy: {{ $.Values.imagePullPolicy }}
+        ports:
+        - {name: http, containerPort: 8080}
+        env:
+        - {name: APP_ROLE, value: {{ $role | quote }}}
+        {{- range $key, $value := $.Values.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- range $key := $.Values.secretKeys }}
+        - name: {{ $key }}
+          valueFrom:
+            secretKeyRef: {name: {{ $.Values.existingSecret }}, key: {{ $key }}}
+        {{- end }}
+        resources:
+          {{- toYaml $.Values.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: ["ALL"]}
+        volumeMounts:
+        - {name: tmp, mountPath: /tmp}
+        startupProbe:
+          httpGet: {path: /actuator/health/liveness, port: http}
+          periodSeconds: 5
+          failureThreshold: 48
+        livenessProbe:
+          httpGet: {path: /actuator/health/liveness, port: http}
+          periodSeconds: 15
+        readinessProbe:
+          httpGet: {path: /actuator/health/readiness, port: http}
+          periodSeconds: 10
+      volumes:
+      - name: tmp
+        emptyDir: {sizeLimit: 64Mi}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  selector: {app: {{ .Release.Name }}-{{ .Values.httpRole }}}
+  ports:
+  - {name: http, port: 8080, targetPort: http}
