@@ -77,7 +77,7 @@ With Docker, kind, kubectl, Helm 3, Bash and OpenSSL available, run from the rep
 ./scripts/kind-up.sh
 ```
 
-The script uses the named kind context `kind-spring-labs`, installs KEDA if its CRD is absent, provisions the lab data services and starts the application. A default StorageClass with dynamic PVC provisioning is required. It prints the port-forward command. `infra/k8s/` contains the native Kubernetes manifests; `infra/kustomization.yaml` packages their startup scripts. `helm/catalog/` owns the Spring deployments, Service, and KEDA configuration. To inspect both sets of objects:
+The script uses the named kind context `kind-spring-labs`, installs KEDA if its CRD is absent, provisions the lab data services and starts the application. A default StorageClass with dynamic PVC provisioning is required. It prints the port-forward command. Run `./scripts/kind-smoke.sh` to verify KEDA readiness and exercise the data path in that cluster. `infra/k8s/` contains the native Kubernetes manifests; `infra/kustomization.yaml` packages their startup scripts. `helm/catalog/` owns the Spring deployments, Service, and KEDA configuration. To inspect both sets of objects:
 
 ```bash
 kubectl kustomize infra

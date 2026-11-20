@@ -13,7 +13,7 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   # Only remove an unfinished bootstrap in the dedicated standby volume.
   rm -rf "$stage"
   until pg_isready -qh "$PRIMARY_HOST"; do sleep 2; done
-  pg_basebackup -h "$PRIMARY_HOST" -U standby_reader -D "$stage" -X stream --no-password
+  pg_basebackup --checkpoint=fast -h "$PRIMARY_HOST" -U standby_reader -D "$stage" -X stream --no-password
   touch "$stage/standby.signal"
   printf "primary_conninfo = 'host=%s port=5432 user=standby_reader passfile=/tmp/standby.pgpass'\n" \
     "$PRIMARY_HOST" >> "$stage/postgresql.auto.conf"

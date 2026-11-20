@@ -1,5 +1,9 @@
 name: Verify reference stack
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -24,3 +28,21 @@ jobs:
     - name: Stop runner containers
       if: always()
       run: docker compose down -v
+
+  kubernetes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+    - uses: actions/checkout@v4
+    - uses: azure/setup-helm@v4
+      with:
+        version: v3.16.4
+    - name: Run on a local Kubernetes cluster with KEDA
+      run: |
+        ./scripts/kind-up.sh
+        ./scripts/kind-smoke.sh
+    - name: Inspect Kubernetes failure
+      if: failure()
+      run: |
+        kubectl --context kind-spring-labs -n catalog-lab get pods,job,scaledobject,hpa,pvc -o wide
+        kubectl --context kind-spring-labs -n catalog-lab get events --sort-by=.lastTimestamp | tail -60
