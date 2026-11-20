@@ -1,0 +1,1 @@
+# spring-sharded-cache
